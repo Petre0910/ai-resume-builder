@@ -8,7 +8,7 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const applicationRoutes = require('./routes/applications');
 const cvRoutes = require('./routes/cv');
-const { initDatabase } = require('./models/database');
+const { initDatabase, initAdminAccount, migrateExistingUsers } = require('./models/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -51,7 +51,12 @@ app.use((err, req, res, next) => {
 });
 
 // Initialize database and start server
-initDatabase().then(() => {
+initDatabase().then(async () => {
+  // Migrate existing users to active status
+  await migrateExistingUsers();
+  // Initialize admin account
+  await initAdminAccount();
+  
   app.listen(PORT, () => {
     console.log(`🚀 AI Resume Builder API running on port ${PORT}`);
   });

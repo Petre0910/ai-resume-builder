@@ -342,7 +342,7 @@ router.delete('/tags/:id', authMiddleware, async (req, res) => {
 router.get('/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const users = await getAll(
-      `SELECT id, email, full_name, address, phone_number, linkedin_profile, github_link, experience_years, role, created_at 
+      `SELECT id, email, full_name, address, phone_number, linkedin_profile, github_link, experience_years, role, status, created_at 
        FROM users ORDER BY created_at DESC`
     );
     res.json({ users });
@@ -356,7 +356,7 @@ router.get('/all', authMiddleware, adminMiddleware, async (req, res) => {
 router.get('/all/profiles', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const users = await getAll(
-      `SELECT id, email, full_name, address, phone_number, linkedin_profile, github_link, experience_years, role, timezone, credly_profile_link, created_at 
+      `SELECT id, email, full_name, address, phone_number, linkedin_profile, github_link, experience_years, role, status, timezone, credly_profile_link, created_at 
        FROM users ORDER BY created_at DESC`
     );
 
@@ -494,6 +494,228 @@ router.delete('/:id', authMiddleware, adminMiddleware, async (req, res) => {
   } catch (error) {
     console.error('User delete error:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Admin: Approve user
+router.put('/:id/approve', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await runQuery(
+      'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      ['active', req.params.id]
+    );
+    res.json({ message: 'User approved successfully' });
+  } catch (error) {
+    console.error('User approval error:', error);
+    res.status(500).json({ error: 'Failed to approve user' });
+  }
+});
+
+// Admin: Reject user
+router.put('/:id/reject', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    await runQuery(
+      'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      ['rejected', req.params.id]
+    );
+    res.json({ message: 'User rejected' });
+  } catch (error) {
+    console.error('User rejection error:', error);
+    res.status(500).json({ error: 'Failed to reject user' });
+  }
+});
+
+// Admin: Update user status
+router.put('/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['pending', 'active', 'rejected'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    await runQuery(
+      'UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [status, req.params.id]
+    );
+    res.json({ message: 'User status updated successfully' });
+  } catch (error) {
+    console.error('Status update error:', error);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// Admin: Get application statistics with time filters
+router.get('/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { period = 'all', userId } = req.query;
+    
+    let dateFilter = '';
+    const params = [];
+    
+    // Set date filter based on period
+    if (period === 'daily') {
+      dateFilter = "AND DATE(a.applied_at) = DATE('now')";
+    } else if (period === 'weekly') {
+      dateFilter = "AND a.applied_at >= DATE('now', '-7 days')";
+    } else if (period === 'monthly') {
+      dateFilter = "AND a.applied_at >= DATE('now', '-30 days')";
+    }
+    
+    // Filter by user if specified
+    let userFilter = '';
+    if (userId) {
+      userFilter = 'AND a.user_id = ?';
+      params.push(userId);
+    }
+    
+    // Get overall stats
+    const totalApps = await getOne(
+      `SELECT COUNT(*) as count FROM applications a WHERE 1=1 ${dateFilter} ${userFilter}`,
+      params
+    );
+    
+    // Get daily breakdown for chart
+    const dailyStats = await getAll(
+      `SELECT DATE(a.applied_at) as date, COUNT(*) as count 
+       FROM applications a 
+       WHERE 1=1 ${dateFilter} ${userFilter}
+       GROUP BY DATE(a.applied_at) 
+       ORDER BY date DESC 
+       LIMIT 30`,
+      params
+    );
+    
+    // Get stats by user
+    const userStats = await getAll(
+      `SELECT u.id, u.full_name, u.email, COUNT(a.id) as application_count
+       FROM users u
+       LEFT JOIN applications a ON u.id = a.user_id ${dateFilter ? 'AND ' + dateFilter.substring(4) : ''}
+       WHERE u.role != 'admin'
+       GROUP BY u.id
+       ORDER BY application_count DESC`,
+      []
+    );
+    
+    // Get stats by company
+    const companyStats = await getAll(
+      `SELECT company_name, COUNT(*) as count 
+       FROM applications a 
+       WHERE company_name IS NOT NULL AND company_name != '' ${dateFilter} ${userFilter}
+       GROUP BY company_name 
+       ORDER BY count DESC 
+       LIMIT 10`,
+      params
+    );
+    
+    // Get hourly distribution for today
+    const hourlyStats = await getAll(
+      `SELECT strftime('%H', a.applied_at) as hour, COUNT(*) as count 
+       FROM applications a 
+       WHERE DATE(a.applied_at) = DATE('now') ${userFilter}
+       GROUP BY hour 
+       ORDER BY hour`,
+      userId ? [userId] : []
+    );
+    
+    // Get weekly trend (last 7 days by day name)
+    const weeklyTrend = await getAll(
+      `SELECT strftime('%w', a.applied_at) as day_num, 
+              CASE strftime('%w', a.applied_at)
+                WHEN '0' THEN 'Sun'
+                WHEN '1' THEN 'Mon'
+                WHEN '2' THEN 'Tue'
+                WHEN '3' THEN 'Wed'
+                WHEN '4' THEN 'Thu'
+                WHEN '5' THEN 'Fri'
+                WHEN '6' THEN 'Sat'
+              END as day_name,
+              COUNT(*) as count 
+       FROM applications a 
+       WHERE a.applied_at >= DATE('now', '-7 days') ${userFilter}
+       GROUP BY day_num 
+       ORDER BY day_num`,
+      userId ? [userId] : []
+    );
+    
+    // Pending users count
+    const pendingUsers = await getOne(
+      "SELECT COUNT(*) as count FROM users WHERE status = 'pending'"
+    );
+    
+    res.json({
+      totalApplications: totalApps?.count || 0,
+      pendingUsers: pendingUsers?.count || 0,
+      dailyStats,
+      userStats,
+      companyStats,
+      hourlyStats,
+      weeklyTrend
+    });
+  } catch (error) {
+    console.error('Stats fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Admin: Get applications with filters
+router.get('/admin/applications', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const { period = 'all', userId, page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+    
+    let dateFilter = '';
+    const params = [];
+    
+    if (period === 'daily') {
+      dateFilter = "AND DATE(a.applied_at) = DATE('now')";
+    } else if (period === 'weekly') {
+      dateFilter = "AND a.applied_at >= DATE('now', '-7 days')";
+    } else if (period === 'monthly') {
+      dateFilter = "AND a.applied_at >= DATE('now', '-30 days')";
+    }
+    
+    let userFilter = '';
+    if (userId) {
+      userFilter = 'AND a.user_id = ?';
+      params.push(userId);
+    }
+    
+    const applications = await getAll(
+      `SELECT a.*, u.full_name, u.email 
+       FROM applications a
+       JOIN users u ON a.user_id = u.id
+       WHERE 1=1 ${dateFilter} ${userFilter}
+       ORDER BY a.applied_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, parseInt(limit), parseInt(offset)]
+    );
+    
+    const totalCount = await getOne(
+      `SELECT COUNT(*) as count FROM applications a WHERE 1=1 ${dateFilter} ${userFilter}`,
+      params
+    );
+    
+    res.json({
+      applications: applications.map(app => ({
+        id: app.id,
+        userId: app.user_id,
+        userName: app.full_name,
+        userEmail: app.email,
+        jobTitle: app.job_title,
+        companyName: app.company_name,
+        appliedAt: app.applied_at,
+        status: app.status,
+        cvDocUrl: app.cv_doc_path ? `/uploads/${app.cv_doc_path}` : null,
+        cvPdfUrl: app.cv_pdf_path ? `/uploads/${app.cv_pdf_path}` : null
+      })),
+      total: totalCount?.count || 0,
+      page: parseInt(page),
+      totalPages: Math.ceil((totalCount?.count || 0) / limit)
+    });
+  } catch (error) {
+    console.error('Applications fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch applications' });
   }
 });
 

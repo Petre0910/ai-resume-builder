@@ -76,7 +76,12 @@ export const usersAPI = {
   getAllProfiles: () => api.get('/users/all/profiles'),
   adminRegisterUser: (data) => api.post('/users/admin/register', data),
   updateUserRole: (id, role) => api.put(`/users/${id}/role`, { role }),
-  deleteUser: (id) => api.delete(`/users/${id}`)
+  deleteUser: (id) => api.delete(`/users/${id}`),
+  approveUser: (id) => api.put(`/users/${id}/approve`),
+  rejectUser: (id) => api.put(`/users/${id}/reject`),
+  updateUserStatus: (id, status) => api.put(`/users/${id}/status`, { status }),
+  getAdminStats: (params = {}) => api.get('/users/admin/stats', { params }),
+  getAdminApplications: (params = {}) => api.get('/users/admin/applications', { params })
 };
 
 // CV API
