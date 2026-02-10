@@ -207,6 +207,11 @@ router.post('/preview', authMiddleware, async (req, res) => {
   }
 });
 
+// Helper function to sanitize filename for download
+function sanitizeDownloadFilename(name) {
+  return name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').trim();
+}
+
 // Download CV as DOCX
 router.get('/download/docx/:applicationId', authMiddleware, async (req, res) => {
   try {
@@ -219,6 +224,11 @@ router.get('/download/docx/:applicationId', authMiddleware, async (req, res) => 
       return res.status(404).json({ error: 'Application not found' });
     }
 
+    // Get user's full name for download filename
+    const user = await getOne('SELECT full_name FROM users WHERE id = ?', [req.user.id]);
+    const downloadFilename = `${sanitizeDownloadFilename(user.full_name)}_Resume.docx`;
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
     res.redirect(`/uploads/${application.cv_doc_path}`);
   } catch (error) {
     console.error('Download error:', error);
@@ -238,7 +248,60 @@ router.get('/download/pdf/:applicationId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Application not found' });
     }
 
+    // Get user's full name for download filename
+    const user = await getOne('SELECT full_name FROM users WHERE id = ?', [req.user.id]);
+    const downloadFilename = `${sanitizeDownloadFilename(user.full_name)}_Resume.pdf`;
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
     res.redirect(`/uploads/${application.cv_pdf_path}`);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Failed to download file' });
+  }
+});
+
+// Download Cover Letter as DOCX
+router.get('/download/cover-letter/docx/:applicationId', authMiddleware, async (req, res) => {
+  try {
+    const application = await getOne(
+      'SELECT * FROM applications WHERE id = ? AND user_id = ?',
+      [req.params.applicationId, req.user.id]
+    );
+
+    if (!application || !application.cover_letter_doc_path) {
+      return res.status(404).json({ error: 'Cover letter not found' });
+    }
+
+    // Get user's full name for download filename
+    const user = await getOne('SELECT full_name FROM users WHERE id = ?', [req.user.id]);
+    const downloadFilename = `${sanitizeDownloadFilename(user.full_name)}_Cover_Letter.docx`;
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+    res.redirect(`/uploads/${application.cover_letter_doc_path}`);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ error: 'Failed to download file' });
+  }
+});
+
+// Download Cover Letter as PDF
+router.get('/download/cover-letter/pdf/:applicationId', authMiddleware, async (req, res) => {
+  try {
+    const application = await getOne(
+      'SELECT * FROM applications WHERE id = ? AND user_id = ?',
+      [req.params.applicationId, req.user.id]
+    );
+
+    if (!application || !application.cover_letter_pdf_path) {
+      return res.status(404).json({ error: 'Cover letter not found' });
+    }
+
+    // Get user's full name for download filename
+    const user = await getOne('SELECT full_name FROM users WHERE id = ?', [req.user.id]);
+    const downloadFilename = `${sanitizeDownloadFilename(user.full_name)}_Cover_Letter.pdf`;
+    
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+    res.redirect(`/uploads/${application.cover_letter_pdf_path}`);
   } catch (error) {
     console.error('Download error:', error);
     res.status(500).json({ error: 'Failed to download file' });

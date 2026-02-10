@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import { applicationsAPI } from '../utils/api';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { toZonedTime, format as formatTz } from 'date-fns-tz';
+import { useAuth } from '../contexts/AuthContext';
+
+// Helper to sanitize filename
+const sanitizeFilename = (name) => name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').trim();
 
 export default function History() {
+  const { user } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
@@ -189,7 +195,11 @@ export default function History() {
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        {format(new Date(app.appliedAt), 'MMM d, yyyy h:mm a')}
+                        {(() => {
+                          const utcDate = app.appliedAt.endsWith('Z') ? parseISO(app.appliedAt) : parseISO(app.appliedAt + 'Z');
+                          const zonedDate = toZonedTime(utcDate, userTimezone);
+                          return formatTz(zonedDate, 'MMM d, yyyy h:mm a', { timeZone: userTimezone });
+                        })()}
                       </span>
                       {app.jdLink && (
                         <a
@@ -215,7 +225,7 @@ export default function History() {
                     {app.cvDocUrl && (
                       <a
                         href={app.cvDocUrl}
-                        download
+                        download={`${sanitizeFilename(user?.full_name || 'Resume')}_Resume.docx`}
                         className="btn btn-secondary py-1 px-2 text-xs"
                         title="Download Resume DOCX"
                       >
@@ -225,7 +235,7 @@ export default function History() {
                     {app.cvPdfUrl && (
                       <a
                         href={app.cvPdfUrl}
-                        download
+                        download={`${sanitizeFilename(user?.full_name || 'Resume')}_Resume.pdf`}
                         className="btn btn-secondary py-1 px-2 text-xs"
                         title="Download Resume PDF"
                       >
@@ -241,7 +251,7 @@ export default function History() {
                       {app.coverLetterDocUrl && (
                         <a
                           href={app.coverLetterDocUrl}
-                          download
+                          download={`${sanitizeFilename(user?.full_name || 'Cover_Letter')}_Cover_Letter.docx`}
                           className="btn btn-secondary py-1 px-2 text-xs"
                           title="Download Cover Letter DOCX"
                         >
@@ -251,7 +261,7 @@ export default function History() {
                       {app.coverLetterPdfUrl && (
                         <a
                           href={app.coverLetterPdfUrl}
-                          download
+                          download={`${sanitizeFilename(user?.full_name || 'Cover_Letter')}_Cover_Letter.pdf`}
                           className="btn btn-secondary py-1 px-2 text-xs"
                           title="Download Cover Letter PDF"
                         >
