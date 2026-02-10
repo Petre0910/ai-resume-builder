@@ -253,8 +253,9 @@ async function generateDocx(cvContent, userInfo, customFilename = null, options 
   });
 
   const buffer = await Packer.toBuffer(doc);
-  // Store with UUID only, display name will be set at download time
-  const filename = `cv_${uuidv4()}.docx`;
+  // Store with full_name_Resume_UUID format
+  const sanitizedName = sanitizeFilename(userInfo.full_name || 'User');
+  const filename = `${sanitizedName}_Resume_${uuidv4()}.docx`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, buffer);
 
@@ -411,8 +412,9 @@ async function generatePdf(cvContent, userInfo, customFilename = null, options =
   // NOTE: Do NOT add additionalSections after "Other" section per requirements
 
   const pdfBytes = await pdfDoc.save();
-  // Store with UUID only, display name will be set at download time
-  const filename = `cv_${uuidv4()}.pdf`;
+  // Store with full_name_Resume_UUID format
+  const sanitizedName = sanitizeFilename(userInfo.full_name || 'User');
+  const filename = `${sanitizedName}_Resume_${uuidv4()}.pdf`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, pdfBytes);
 
@@ -514,8 +516,9 @@ async function generateCoverLetterDocx(coverLetterContent, userInfo, customFilen
   });
 
   const buffer = await Packer.toBuffer(doc);
-  // Store with UUID only, display name will be set at download time
-  const filename = `cover_letter_${uuidv4()}.docx`;
+  // Store with full_name_Cover_Letter_UUID format
+  const sanitizedName = sanitizeFilename(userInfo.full_name || 'User');
+  const filename = `${sanitizedName}_Cover_Letter_${uuidv4()}.docx`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, buffer);
 
@@ -612,8 +615,9 @@ async function generateCoverLetterPdf(coverLetterContent, userInfo, customFilena
   drawText(userInfo.full_name, { size: 11 });
 
   const pdfBytes = await pdfDoc.save();
-  // Store with UUID only, display name will be set at download time
-  const filename = `cover_letter_${uuidv4()}.pdf`;
+  // Store with full_name_Cover_Letter_UUID format
+  const sanitizedName = sanitizeFilename(userInfo.full_name || 'User');
+  const filename = `${sanitizedName}_Cover_Letter_${uuidv4()}.pdf`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, pdfBytes);
 

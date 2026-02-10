@@ -4,6 +4,11 @@ const DEFAULT_CONFIG = {
   dashboardUrl: 'http://localhost:5173'
 };
 
+// Helper to sanitize filename
+function sanitizeFilename(name) {
+  return name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').trim();
+}
+
 // State
 let config = { ...DEFAULT_CONFIG };
 let authToken = null;
@@ -506,12 +511,12 @@ async function handleGenerate(skipDuplicateCheck = false) {
     document.getElementById('downloadCoverLetterDoc').href = `${config.apiUrl}${data.application.coverLetterDocUrl}`;
     document.getElementById('downloadCoverLetterPdf').href = `${config.apiUrl}${data.application.coverLetterPdfUrl}`;
 
-    // Set download file names
-    const fullName = currentUser?.full_name || 'User';
+    // Set download file names (sanitized for valid filenames)
+    const fullName = sanitizeFilename(currentUser?.full_name || 'User');
     document.getElementById('downloadResumeDoc').download = `${fullName}_Resume.docx`;
     document.getElementById('downloadResumePdf').download = `${fullName}_Resume.pdf`;
-    document.getElementById('downloadCoverLetterDoc').download = `${fullName}_Cover Letter.docx`;
-    document.getElementById('downloadCoverLetterPdf').download = `${fullName}_Cover Letter.pdf`;
+    document.getElementById('downloadCoverLetterDoc').download = `${fullName}_Cover_Letter.docx`;
+    document.getElementById('downloadCoverLetterPdf').download = `${fullName}_Cover_Letter.pdf`;
 
   } catch (error) {
     loadingIndicator.classList.add('hidden');
