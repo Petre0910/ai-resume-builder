@@ -219,7 +219,7 @@ async function generateDocx(cvContent, userInfo, customFilename = null, options 
     }
   }
 
-  // Tags as "Other" section
+  // Tags as "Other" section - this is the LAST section, nothing should come after it
   if (tags && tags.length > 0) {
     sections.push(
       new Paragraph({
@@ -234,22 +234,7 @@ async function generateDocx(cvContent, userInfo, customFilename = null, options 
     );
   }
 
-  // Additional Sections
-  if (cvContent.additionalSections && cvContent.additionalSections.length > 0) {
-    for (const section of cvContent.additionalSections) {
-      sections.push(
-        new Paragraph({
-          children: [new TextRun({ text: section.title.toUpperCase(), bold: true, size: 24 })],
-          spacing: { before: 300, after: 100 }
-        })
-      );
-      sections.push(
-        new Paragraph({
-          children: [new TextRun({ text: section.content, size: 22 })]
-        })
-      );
-    }
-  }
+  // NOTE: Do NOT add additionalSections after "Other" section per requirements
 
   const doc = new Document({
     sections: [{
@@ -268,7 +253,8 @@ async function generateDocx(cvContent, userInfo, customFilename = null, options 
   });
 
   const buffer = await Packer.toBuffer(doc);
-  const filename = customFilename ? `${sanitizeFilename(customFilename)}_${uuidv4()}.docx` : `cv_${uuidv4()}.docx`;
+  // Store with UUID only, display name will be set at download time
+  const filename = `cv_${uuidv4()}.docx`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, buffer);
 
@@ -416,22 +402,17 @@ async function generatePdf(cvContent, userInfo, customFilename = null, options =
     }
   }
 
-  // Tags as "Other" section
+  // Tags as "Other" section - this is the LAST section, nothing should come after it
   if (tags && tags.length > 0) {
     drawSection('Other');
     drawText(tags.join(' • '));
   }
 
-  // Additional
-  if (cvContent.additionalSections && cvContent.additionalSections.length > 0) {
-    for (const section of cvContent.additionalSections) {
-      drawSection(section.title);
-      drawText(section.content);
-    }
-  }
+  // NOTE: Do NOT add additionalSections after "Other" section per requirements
 
   const pdfBytes = await pdfDoc.save();
-  const filename = customFilename ? `${sanitizeFilename(customFilename)}_${uuidv4()}.pdf` : `cv_${uuidv4()}.pdf`;
+  // Store with UUID only, display name will be set at download time
+  const filename = `cv_${uuidv4()}.pdf`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, pdfBytes);
 
@@ -533,7 +514,8 @@ async function generateCoverLetterDocx(coverLetterContent, userInfo, customFilen
   });
 
   const buffer = await Packer.toBuffer(doc);
-  const filename = customFilename ? `${sanitizeFilename(customFilename)}_${uuidv4()}.docx` : `cover_letter_${uuidv4()}.docx`;
+  // Store with UUID only, display name will be set at download time
+  const filename = `cover_letter_${uuidv4()}.docx`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, buffer);
 
@@ -630,7 +612,8 @@ async function generateCoverLetterPdf(coverLetterContent, userInfo, customFilena
   drawText(userInfo.full_name, { size: 11 });
 
   const pdfBytes = await pdfDoc.save();
-  const filename = customFilename ? `${sanitizeFilename(customFilename)}_${uuidv4()}.pdf` : `cover_letter_${uuidv4()}.pdf`;
+  // Store with UUID only, display name will be set at download time
+  const filename = `cover_letter_${uuidv4()}.pdf`;
   const filepath = path.join(UPLOAD_DIR, filename);
   await fs.writeFile(filepath, pdfBytes);
 

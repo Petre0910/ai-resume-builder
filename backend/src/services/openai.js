@@ -23,8 +23,9 @@ EXPERIENCE GUIDELINES:
 - For OTHER positions: Write 4-6 concise sentences/bullet points focusing on key achievements and relevant experience.
 
 SUMMARY GUIDELINES:
-- Write a compelling 7-8 sentence professional summary
-- Start with years of experience and primary role focus
+- Write a compelling 7-8 sentence professional summary in FIRST PERSON (use "I" statements)
+- Do NOT mention the candidate's name in the summary
+- Start with years of experience and primary role focus (e.g., "I am a Software Engineer with 10+ years of experience...")
 - Include 2-3 key areas of expertise with specific technologies
 - Mention notable achievements with metrics where possible
 - Include relevant industry experience and domain knowledge
@@ -51,7 +52,7 @@ SKILLS GUIDELINES (VERY IMPORTANT):
 
 OUTPUT FORMAT (JSON):
 {
-  "summary": "Detailed 7-8 sentence professional summary tailored to the job with specific expertise, achievements, domain knowledge, and career objectives",
+  "summary": "Detailed 7-8 sentence professional summary in FIRST PERSON (using 'I' statements, without mentioning name) tailored to the job with specific expertise, achievements, domain knowledge, and career objectives",
   "skills": "Programming Languages: skill1, skill2, skill3...\\nFrameworks & Libraries: skill1, skill2...\\nCloud Technologies & Services: skill1, skill2...\\nArchitecture: skill1, skill2...\\nDatabases & Data Storage: skill1, skill2...\\nDevOps & CI/CD: skill1, skill2...\\nVersion Control & Collaboration: skill1, skill2...\\nTesting & Quality Assurance: skill1, skill2...\\nAdditional Skills: skill1, skill2...",
   "experience": [
     {
@@ -125,10 +126,11 @@ ${jobDescription}
 Generate a professional, highly tailored resume in the JSON format specified. 
 
 CRITICAL REQUIREMENTS:
-1. SUMMARY: Must be 7-8 sentences covering experience, expertise, achievements, domain knowledge, leadership, certifications, and career objectives
+1. SUMMARY: Must be 7-8 sentences in FIRST PERSON (use "I" statements) WITHOUT mentioning the candidate's name, covering experience, expertise, achievements, domain knowledge, leadership, certifications, and career objectives
 2. SKILLS: Must include AT LEAST 40 skills organized by category (Programming Languages, Frameworks & Libraries, Cloud Technologies, Architecture, Databases, DevOps, Version Control, Testing, Additional Skills)
 3. EXPERIENCE (First 2 positions): Must have AT LEAST 10 detailed bullet points each with specific metrics, technologies, and business impact
 4. EXPERIENCE (Other positions): Must have 4-6 bullet points each
+5. DO NOT include "additionalSections" - any extra content should be omitted
 
 Format skills EXACTLY like: "Programming Languages: Java, Python, JavaScript...\\nFrameworks & Libraries: React, Spring Boot...\\n..." etc.`;
 

@@ -6,14 +6,14 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
-    allowedHosts: 'all',
+    allowedHosts: ['.all-hands.dev', 'localhost'],
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:12000',
         changeOrigin: true
       },
       '/uploads': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:12000',
         changeOrigin: true
       }
     }
