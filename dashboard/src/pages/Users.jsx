@@ -1,6 +1,33 @@
 import { useState, useEffect } from 'react';
 import { usersAPI, applicationsAPI } from '../utils/api';
 import { format } from 'date-fns';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -20,10 +47,21 @@ export default function Users() {
     role: 'user'
   });
   const [registerLoading, setRegisterLoading] = useState(false);
+  
+  // Stats and filter state
+  const [adminStats, setAdminStats] = useState(null);
+  const [period, setPeriod] = useState('all');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [filteredApplications, setFilteredApplications] = useState([]);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchStats();
+    fetchFilteredApplications();
+  }, [period, selectedUserId]);
 
   const fetchData = async () => {
     try {
@@ -40,6 +78,55 @@ export default function Users() {
       setMessage({ type: 'error', text: 'Failed to load data' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const params = { period };
+      if (selectedUserId) params.userId = selectedUserId;
+      const res = await usersAPI.getAdminStats(params);
+      setAdminStats(res.data);
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    }
+  };
+
+  const fetchFilteredApplications = async () => {
+    try {
+      const params = { period, limit: 50 };
+      if (selectedUserId) params.userId = selectedUserId;
+      const res = await usersAPI.getAdminApplications(params);
+      setFilteredApplications(res.data.applications);
+    } catch (error) {
+      console.error('Failed to fetch filtered applications:', error);
+    }
+  };
+
+  const handleApproveUser = async (userId) => {
+    try {
+      await usersAPI.approveUser(userId);
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, status: 'active' } : u
+      ));
+      setMessage({ type: 'success', text: 'User approved successfully' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to approve user' });
+    }
+  };
+
+  const handleRejectUser = async (userId) => {
+    if (!confirm('Are you sure you want to reject this user?')) return;
+    try {
+      await usersAPI.rejectUser(userId);
+      setUsers(prev => prev.map(u => 
+        u.id === userId ? { ...u, status: 'rejected' } : u
+      ));
+      setMessage({ type: 'success', text: 'User rejected' });
+      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to reject user' });
     }
   };
 
@@ -130,10 +217,14 @@ export default function Users() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="card p-6">
           <div className="text-3xl font-bold text-gray-900">{users.length}</div>
           <div className="text-gray-500">Total Users</div>
+        </div>
+        <div className="card p-6">
+          <div className="text-3xl font-bold text-yellow-600">{users.filter(u => u.status === 'pending').length}</div>
+          <div className="text-gray-500">Pending Approval</div>
         </div>
         <div className="card p-6">
           <div className="text-3xl font-bold text-gray-900">{applications.length}</div>
@@ -167,6 +258,16 @@ export default function Users() {
             Users ({users.length})
           </button>
           <button
+            onClick={() => setActiveTab('analytics')}
+            className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'analytics'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📊 Analytics
+          </button>
+          <button
             onClick={() => setActiveTab('profiles')}
             className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
               activeTab === 'profiles'
@@ -189,6 +290,193 @@ export default function Users() {
         </nav>
       </div>
 
+      {/* Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {/* Filters */}
+          <div className="card p-4 flex flex-wrap gap-4 items-center">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
+              <select
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                className="input"
+              >
+                <option value="all">All Time</option>
+                <option value="daily">Today</option>
+                <option value="weekly">This Week</option>
+                <option value="monthly">This Month</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Filter by User</label>
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="input"
+              >
+                <option value="">All Users</option>
+                {users.filter(u => u.role !== 'admin').map(user => (
+                  <option key={user.id} value={user.id}>{user.full_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1"></div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-primary-600">{adminStats?.totalApplications || 0}</div>
+              <div className="text-sm text-gray-500">Applications ({period === 'all' ? 'All Time' : period})</div>
+            </div>
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Daily Activity Chart */}
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Application Activity</h3>
+              {adminStats?.dailyStats?.length > 0 ? (
+                <Line
+                  data={{
+                    labels: adminStats.dailyStats.map(d => format(new Date(d.date), 'MMM d')).reverse(),
+                    datasets: [{
+                      label: 'Applications',
+                      data: adminStats.dailyStats.map(d => d.count).reverse(),
+                      fill: true,
+                      borderColor: '#667eea',
+                      backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                      tension: 0.4
+                    }]
+                  }}
+                  options={{
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                  }}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  No data for selected period
+                </div>
+              )}
+            </div>
+
+            {/* Weekly Trend */}
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Trend</h3>
+              {adminStats?.weeklyTrend?.length > 0 ? (
+                <Bar
+                  data={{
+                    labels: adminStats.weeklyTrend.map(d => d.day_name),
+                    datasets: [{
+                      label: 'Applications',
+                      data: adminStats.weeklyTrend.map(d => d.count),
+                      backgroundColor: '#667eea'
+                    }]
+                  }}
+                  options={{
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                  }}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  No data for this week
+                </div>
+              )}
+            </div>
+
+            {/* Applications by User */}
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Applications by User</h3>
+              {adminStats?.userStats?.filter(u => u.application_count > 0).length > 0 ? (
+                <Bar
+                  data={{
+                    labels: adminStats.userStats.filter(u => u.application_count > 0).slice(0, 10).map(u => u.full_name),
+                    datasets: [{
+                      label: 'Applications',
+                      data: adminStats.userStats.filter(u => u.application_count > 0).slice(0, 10).map(u => u.application_count),
+                      backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#30cfd0', '#a8ff78']
+                    }]
+                  }}
+                  options={{
+                    responsive: true,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                  }}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  No application data
+                </div>
+              )}
+            </div>
+
+            {/* Top Companies */}
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Companies</h3>
+              {adminStats?.companyStats?.length > 0 ? (
+                <Doughnut
+                  data={{
+                    labels: adminStats.companyStats.map(c => c.company_name),
+                    datasets: [{
+                      data: adminStats.companyStats.map(c => c.count),
+                      backgroundColor: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#43e97b', '#fa709a', '#fee140', '#30cfd0', '#a8ff78']
+                    }]
+                  }}
+                  options={{
+                    responsive: true,
+                    plugins: { legend: { position: 'right' } }
+                  }}
+                />
+              ) : (
+                <div className="h-64 flex items-center justify-center text-gray-400">
+                  No company data
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Filtered Applications Table */}
+          <div className="card overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Recent Applications</h3>
+            </div>
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Job Title</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applied At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredApplications.length > 0 ? filteredApplications.map(app => (
+                  <tr key={app.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-gray-900">{app.userName}</div>
+                      <div className="text-sm text-gray-500">{app.userEmail}</div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-900">{app.jobTitle || '-'}</td>
+                    <td className="px-6 py-4 text-gray-900">{app.companyName || '-'}</td>
+                    <td className="px-6 py-4 text-gray-500">
+                      {app.appliedAt ? format(new Date(app.appliedAt), 'MMM d, yyyy h:mm a') : '-'}
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-8 text-center text-gray-400">
+                      No applications found for the selected filters
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Users Tab */}
       {activeTab === 'users' && (
         <div className="card overflow-hidden">
@@ -197,6 +485,7 @@ export default function Users() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -222,6 +511,16 @@ export default function Users() {
                     {user.phone_number || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      user.status === 'active' ? 'bg-green-100 text-green-700' :
+                      user.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                      user.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {user.status || 'active'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <select
                       value={user.role}
                       onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -235,12 +534,32 @@ export default function Users() {
                     {format(new Date(user.created_at), 'MMM d, yyyy')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                    <button
-                      onClick={() => handleDeleteUser(user.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex gap-2 justify-end">
+                      {user.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleApproveUser(user.id)}
+                            className="text-green-600 hover:text-green-700 font-medium"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectUser(user.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+                      {user.status !== 'pending' && (
+                        <button
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

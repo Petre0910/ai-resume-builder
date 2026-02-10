@@ -5,7 +5,7 @@ const { generateToken, authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Register new user
+// Register new user (status: pending - requires admin approval)
 router.post('/register', async (req, res) => {
   try {
     const {
@@ -33,20 +33,19 @@ router.post('/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user with timezone
+    // Insert user with pending status - requires admin approval
     const result = await runQuery(
-      `INSERT INTO users (email, password, full_name, address, phone_number, linkedin_profile, github_link, experience_years, timezone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [email, hashedPassword, full_name, address || '', phone_number || '', linkedin_profile || '', github_link || '', experience_years || 0, timezone || 'UTC']
+      `INSERT INTO users (email, password, full_name, address, phone_number, linkedin_profile, github_link, experience_years, timezone, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [email, hashedPassword, full_name, address || '', phone_number || '', linkedin_profile || '', github_link || '', experience_years || 0, timezone || 'UTC', 'pending']
     );
 
-    const user = await getOne('SELECT id, email, full_name, role, timezone FROM users WHERE id = ?', [result.lastID]);
-    const token = generateToken(user);
+    const user = await getOne('SELECT id, email, full_name, role, timezone, status FROM users WHERE id = ?', [result.lastID]);
 
     res.status(201).json({
-      message: 'User registered successfully',
-      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role, timezone: user.timezone },
-      token
+      message: 'Registration successful. Your account is pending admin approval.',
+      user: { id: user.id, email: user.email, full_name: user.full_name, status: user.status },
+      requiresApproval: true
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -73,6 +72,21 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Check user status
+    if (user.status === 'pending') {
+      return res.status(403).json({ 
+        error: 'Your account is pending admin approval. Please wait for approval before signing in.',
+        status: 'pending'
+      });
+    }
+
+    if (user.status === 'rejected') {
+      return res.status(403).json({ 
+        error: 'Your account has been rejected. Please contact administrator.',
+        status: 'rejected'
+      });
+    }
+
     const token = generateToken(user);
 
     res.json({
@@ -82,6 +96,7 @@ router.post('/login', async (req, res) => {
         email: user.email, 
         full_name: user.full_name, 
         role: user.role,
+        status: user.status,
         timezone: user.timezone || 'UTC'
       },
       token

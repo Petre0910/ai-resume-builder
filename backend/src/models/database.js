@@ -1,5 +1,6 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'resume_builder.db');
 let db;
@@ -16,7 +17,7 @@ function initDatabase() {
     const database = getDb();
     
     database.serialize(() => {
-      // Users table
+      // Users table with status column
       database.run(`
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,6 +31,7 @@ function initDatabase() {
           experience_years INTEGER DEFAULT 0,
           timezone TEXT DEFAULT 'UTC',
           role TEXT DEFAULT 'user',
+          status TEXT DEFAULT 'pending',
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -42,6 +44,11 @@ function initDatabase() {
 
       // Add credly_profile_link column if it doesn't exist (for existing databases)
       database.run(`ALTER TABLE users ADD COLUMN credly_profile_link TEXT`, (err) => {
+        // Ignore error if column already exists
+      });
+
+      // Add status column if it doesn't exist (for existing databases)
+      database.run(`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'pending'`, (err) => {
         // Ignore error if column already exists
       });
 
@@ -189,4 +196,47 @@ function getAll(sql, params = []) {
   });
 }
 
-module.exports = { getDb, initDatabase, runQuery, getOne, getAll };
+// Initialize admin account
+async function initAdminAccount() {
+  try {
+    const adminEmail = 'Perfectdev0910@gmail.com';
+    const adminPassword = 'Betop2002)(!)';
+    
+    // Check if admin already exists
+    const existingAdmin = await getOne('SELECT id FROM users WHERE email = ?', [adminEmail]);
+    if (existingAdmin) {
+      // Update existing admin to ensure they have admin role and active status
+      await runQuery(
+        'UPDATE users SET role = ?, status = ? WHERE email = ?',
+        ['admin', 'active', adminEmail]
+      );
+      console.log('Admin account updated');
+      return;
+    }
+    
+    // Create admin account
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    await runQuery(
+      `INSERT INTO users (email, password, full_name, role, status, timezone)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [adminEmail, hashedPassword, 'Admin User', 'admin', 'active', 'UTC']
+    );
+    console.log('Admin account created successfully');
+  } catch (error) {
+    console.error('Error initializing admin account:', error);
+  }
+}
+
+// Update existing users to have 'active' status if they don't have a status
+async function migrateExistingUsers() {
+  try {
+    await runQuery(
+      "UPDATE users SET status = 'active' WHERE status IS NULL OR status = ''"
+    );
+    console.log('Existing users migrated to active status');
+  } catch (error) {
+    console.error('Error migrating existing users:', error);
+  }
+}
+
+module.exports = { getDb, initDatabase, runQuery, getOne, getAll, initAdminAccount, migrateExistingUsers };
