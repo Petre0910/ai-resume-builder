@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { cvAPI, applicationsAPI } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 
+// Helper to sanitize filename
+const sanitizeFilename = (name) => name.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').trim();
+
 export default function Generate() {
   const { user } = useAuth();
   const [jobDescription, setJobDescription] = useState('');
@@ -87,7 +90,7 @@ export default function Generate() {
     setShowDuplicateModal(false);
   };
   
-  const fullName = user?.full_name || 'User';
+  const fullName = sanitizeFilename(user?.full_name || 'User');
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -165,7 +168,7 @@ export default function Generate() {
                 <div className="flex gap-3">
                   <a
                     href={result.application?.coverLetterDocUrl}
-                    download={`${fullName}_Cover Letter.docx`}
+                    download={`${fullName}_Cover_Letter.docx`}
                     className="btn bg-green-600 text-white hover:bg-green-700"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -175,7 +178,7 @@ export default function Generate() {
                   </a>
                   <a
                     href={result.application?.coverLetterPdfUrl}
-                    download={`${fullName}_Cover Letter.pdf`}
+                    download={`${fullName}_Cover_Letter.pdf`}
                     className="btn bg-white text-green-700 border border-green-300 hover:bg-green-50"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
