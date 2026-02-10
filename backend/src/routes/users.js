@@ -15,7 +15,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
     );
 
     const employmentHistory = await getAll(
-      'SELECT * FROM employment_history WHERE user_id = ? ORDER BY start_date DESC',
+      'SELECT * FROM employment_history WHERE user_id = ? ORDER BY CASE WHEN end_date IS NULL OR end_date = "" OR LOWER(end_date) = "present" THEN 0 ELSE 1 END, start_date DESC',
       [req.user.id]
     );
 
@@ -363,7 +363,7 @@ router.get('/all/profiles', authMiddleware, adminMiddleware, async (req, res) =>
     // Fetch full profile details for each user
     const profiles = await Promise.all(users.map(async (user) => {
       const employmentHistory = await getAll(
-        'SELECT * FROM employment_history WHERE user_id = ? ORDER BY start_date DESC',
+        'SELECT * FROM employment_history WHERE user_id = ? ORDER BY CASE WHEN end_date IS NULL OR end_date = "" OR LOWER(end_date) = "present" THEN 0 ELSE 1 END, start_date DESC',
         [user.id]
       );
 
