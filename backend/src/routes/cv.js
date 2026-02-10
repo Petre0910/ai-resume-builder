@@ -23,7 +23,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
     );
 
     const employmentHistory = await getAll(
-      'SELECT * FROM employment_history WHERE user_id = ? ORDER BY start_date DESC',
+      'SELECT * FROM employment_history WHERE user_id = ? ORDER BY CASE WHEN end_date IS NULL OR end_date = "" OR LOWER(end_date) = "present" THEN 0 ELSE 1 END, start_date DESC',
       [req.user.id]
     );
 
@@ -147,7 +147,7 @@ router.post('/preview', authMiddleware, async (req, res) => {
     );
 
     const employmentHistory = await getAll(
-      'SELECT * FROM employment_history WHERE user_id = ? ORDER BY start_date DESC',
+      'SELECT * FROM employment_history WHERE user_id = ? ORDER BY CASE WHEN end_date IS NULL OR end_date = "" OR LOWER(end_date) = "present" THEN 0 ELSE 1 END, start_date DESC',
       [req.user.id]
     );
 
